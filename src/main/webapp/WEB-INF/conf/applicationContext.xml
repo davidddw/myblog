@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+	xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:tx="http://www.springframework.org/schema/tx" 
+	xmlns:cache="http://www.springframework.org/schema/cache" 
+	xmlns:p="http://www.springframework.org/schema/p" 
+	xmlns:jpa="http://www.springframework.org/schema/data/jpa"  
+	xmlns:context="http://www.springframework.org/schema/context"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans 
+		http://www.springframework.org/schema/beans/spring-beans.xsd
+		http://www.springframework.org/schema/tx
+		http://www.springframework.org/schema/tx/spring-tx.xsd
+		http://www.springframework.org/schema/aop 
+		http://www.springframework.org/schema/aop/spring-aop.xsd
+		http://www.springframework.org/schema/cache 
+		http://www.springframework.org/schema/cache/spring-cache.xsd
+  		http://www.springframework.org/schema/context   
+   		http://www.springframework.org/schema/context/spring-context.xsd
+   		http://www.springframework.org/schema/data/jpa
+    	http://www.springframework.org/schema/data/jpa/spring-jpa.xsd">
+   		
+   	<!-- 注解支持 -->
+    <context:annotation-config />
+   	
+   	<!-- 启动组件扫描，排除@Controller组件，该组件由SpringMVC配置文件扫描 -->
+	<context:component-scan base-package="org.tcloud">
+	<!--	<context:exclude-filter type="annotation"
+     		expression="org.springframework.stereotype.Controller" />-->
+    </context:component-scan>
+	<!-- 支持aop注解 -->
+	<aop:aspectj-autoproxy />
+
+	<!-- 属性文件位置 -->
+    <context:property-placeholder location="/WEB-INF/conf/jdbc.properties" />
+
+	<bean id="dataSource" class="com.jolbox.bonecp.BoneCPDataSource" destroy-method="close">
+		<!-- 数据库驱动 -->
+        <property name="driverClass" value="${jdbc.driverClassName}" />
+        <!-- 相应驱动的jdbcUrl-->
+        <property name="jdbcUrl" value="${jdbc.url}" />
+        <!-- 数据库的用户名 -->
+        <property name="username" value="${jdbc.username}" />
+        <!-- 数据库的密码 -->
+        <property name="password" value="${jdbc.password}" />
+        <!-- 检查数据库连接池中空闲连接的间隔时间，单位是分，默认值：240，如果要取消则设置为0 -->
+        <property name="idleConnectionTestPeriodInMinutes"
+            value="${BoneCP.idleConnectionTestPeriodInMinutes}" />
+        <!-- 连接池中未使用的链接最大存活时间，单位是分，默认值：60，如果要永远存活设置为0 -->
+        <property name="idleMaxAgeInMinutes" value="${BoneCP.idleMaxAgeInMinutes}" />
+        <!-- 每个分区最大的连接数 -->
+        <property name="maxConnectionsPerPartition"
+            value="${BoneCP.maxConnectionsPerPartition}" />
+        <!-- 每个分区最小的连接数 -->
+        <property name="minConnectionsPerPartition"
+            value="${BoneCP.minConnectionsPerPartition}" />
+        <!-- 分区数 ，默认值2，最小1，推荐3-4，视应用而定 -->
+        <property name="partitionCount"
+            value="${BoneCP.partitionCount}" />
+        <!-- 每次去拿数据库连接的时候一次性要拿几个,默认值：2 -->
+        <property name="acquireIncrement"
+            value="${BoneCP.acquireIncrement}" />
+        <!-- 缓存prepared statements的大小，默认值：0 -->
+        <property name="statementsCacheSize"
+            value="${BoneCP.statementsCacheSize}" />
+        <!-- 每个分区释放链接助理进程的数量，默认值：3，除非你的一个数据库连接的时间内做了很多工作，不然过多的助理进程会影响你的性能 -->
+        <property name="releaseHelperThreads"
+            value="${BoneCP.releaseHelperThreads}" />
+	</bean>
+	
+	<bean id="entityManagerFactory"
+		class="org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean">
+		<property name="dataSource" ref="dataSource" />
+		<property name="jpaVendorAdapter" ref="hibernateJpaVendorAdapter"/>
+		<property name="jpaProperties">
+        	<props>
+         		<prop key="hibernate.dialect">org.hibernate.dialect.MySQL5Dialect</prop>
+         		<prop key="hibernate.show_sql">true</prop>
+         		<!-- <prop key="hibernate.format_sql">true</prop> -->
+         		<prop key="hibernate.use_sql_comments">false</prop>
+				<prop key="hibernate.hbm2ddl.auto">update</prop>
+				<prop key="hibernate.generate_statistics">true</prop>
+				<prop key="hibernate.cache.use_second_level_cache">true</prop>
+				<prop key="hibernate.cache.use_query_cache">true</prop>
+				<prop key="hibernate.cache.region.factory_class">org.hibernate.cache.ehcache.EhCacheRegionFactory</prop>
+      		</props>
+        </property> 
+		<property name="packagesToScan" value="org.tcloud.domain"/>
+	</bean>
+	
+	<bean id="hibernateJpaVendorAdapter" class="org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter">
+		<property name="databasePlatform" value="org.hibernate.dialect.MySQL5Dialect"/>
+        <property name="generateDdl"><value>false</value></property> 
+	</bean>
+	
+	<tx:annotation-driven transaction-manager="transactionManager" />
+
+	<bean id="transactionManager" class="org.springframework.orm.jpa.JpaTransactionManager">
+		<property name="entityManagerFactory" ref="entityManagerFactory" />
+	</bean>
+
+	<jpa:repositories base-package="org.tcloud.repository"
+		entity-manager-factory-ref="entityManagerFactory"
+		transaction-manager-ref="transactionManager" />
+	
+	<!-- 启用缓存注解功能 -->
+    <cache:annotation-driven cache-manager="cacheManager" />
+    
+
+    <!-- 声明cacheManager     -->
+    <bean id="cacheManager"
+        class="org.springframework.cache.ehcache.EhCacheCacheManager"
+        p:cacheManager-ref="ehcache" />
+
+    <!-- cacheManager工厂类，指定ehcache.xml的位置 -->
+    <bean id="ehcache"
+        class="org.springframework.cache.ehcache.EhCacheManagerFactoryBean"
+        p:configLocation="/WEB-INF/conf/ehcache.xml" />
+        
+    
+	<!-- Shiro SecurityManager，注入到filter中 
+    <bean id="securityManager"
+        class="org.apache.shiro.web.mgt.DefaultWebSecurityManager">
+        <property name="realm" ref="shiroDbRealm" />
+    </bean> -->
+    
+	<!-- 項目自定义的Realm 
+    <bean id="shiroDbRealm" class="org.tcloud.realm.ShiroDbRealm" ></bean> -->
+    
+	<!-- Shiro Filter 
+    <bean id="shiroFilter"
+        class="org.apache.shiro.spring.web.ShiroFilterFactoryBean">
+        <property name="securityManager" ref="securityManager" />
+        <property name="loginUrl" value="/login" />
+        <property name="successUrl" value="/admin/" />
+        <property name="unauthorizedUrl" value="/login" />
+        <property name="filterChainDefinitions">
+            <value>
+				/login = anon                
+				/admin/** = authc
+            </value>
+        </property>
+    </bean>-->
+    
+</beans>
